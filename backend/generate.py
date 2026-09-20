@@ -41,7 +41,6 @@ RESULTS_DIR = STORAGE / "results"
 RECIPES_FILE = ROOT.parent / "data" / "recipes.json"
 
 MAX_BYTES = 8 * 1024 * 1024
-TIMEOUT_CAP = 60
 RESULT_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 SIDECAR_REQUIRED = ("image", "provider", "model", "generatedAt", "inputPhoto")
 
@@ -91,19 +90,6 @@ def _read_sidecar(recipe_id: str) -> dict | None:
         return None
 
 
-def live_timeout() -> int:
-    """Timeout comes from what pregen actually measured, not from a round number.
-
-    Slowest recorded seed x 1.5, capped. No pregen data yet -> use the cap.
-    """
-    durations = [
-        m["durationSec"]
-        for rid in (r["id"] for r in load_recipes())
-        if (m := _read_sidecar(rid)) and isinstance(m.get("durationSec"), (int, float))
-    ]
-    return min(TIMEOUT_CAP, round(max(durations) * 1.5)) if durations else TIMEOUT_CAP
-
-
 def _call_provider(prompt: str, image_bytes: bytes) -> bytes:
     """Prompt + user photo -> image bytes. Returns bytes only; writes nothing.
 
@@ -114,7 +100,10 @@ def _call_provider(prompt: str, image_bytes: bytes) -> bytes:
     Fill it in by reading the provider's live docs for the exact model id, endpoint
     and request shape. Do not write the call from memory.
 
-    Must honour: live_timeout() as a hard deadline, zero retries, no filesystem access.
+    Must honour: a hard deadline, zero retries, no filesystem access.
+    Set the deadline from what pregen measured — the slowest seed's durationSec in
+    storage/fallback/*.json, times 1.5, capped at 60s. A round number picked now
+    would just be a guess about a provider nobody has called yet.
     """
     raise NotImplementedError("provider not selected yet -- see docstring")
 

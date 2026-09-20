@@ -206,6 +206,46 @@
     .step{grid-template-columns:58px 1fr; gap:14px}
     .step::before{left:57px}
   }
+
+  /* ---- nav ---- */
+  nav.toc{
+    position:sticky; top:env(safe-area-inset-top,0px); z-index:5;
+    background:color-mix(in srgb, var(--ground) 92%, transparent);
+    backdrop-filter:blur(8px); border-bottom:1px solid var(--line);
+    margin:0 -16px; padding:10px 16px; overflow-x:auto;
+  }
+  nav.toc ul{display:flex; gap:6px; list-style:none; margin:0; padding:0; width:max-content}
+  nav.toc a{
+    display:block; white-space:nowrap; text-decoration:none; color:var(--muted);
+    font-family:var(--font-mono); font-size:.72rem; letter-spacing:.02em;
+    padding:5px 11px; border-radius:100px; border:1px solid var(--line); background:var(--surface);
+  }
+  nav.toc a:hover,nav.toc a:focus-visible{color:var(--accent); border-color:var(--accent)}
+  :target{scroll-margin-top:64px}
+  a{color:var(--accent)}
+  .banner{
+    background:var(--accent-soft); border-radius:4px; padding:14px 18px;
+    font-size:.89rem; line-height:1.6; color:var(--ink);
+  }
+  .banner b{color:var(--accent)}
+  .inv{display:flex; flex-direction:column; gap:10px; counter-reset:iv}
+  .inv li{
+    counter-increment:iv; list-style:none; display:grid; grid-template-columns:26px 1fr; gap:13px;
+    background:var(--surface); border:1px solid var(--line); border-left:3px solid var(--accent);
+    border-radius:4px; padding:14px 16px; font-size:.91rem; line-height:1.58;
+  }
+  .inv li::before{
+    content:counter(iv); font-family:var(--font-mono); font-size:.78rem; font-weight:600;
+    color:var(--accent); background:var(--accent-soft); border-radius:3px; text-align:center; height:22px; line-height:22px;
+  }
+  .done{color:var(--live); font-weight:600}
+  .kept{color:var(--muted)}
+  .metrics{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px}
+  .metric{background:var(--surface); border:1px solid var(--line); border-radius:4px; padding:16px 18px}
+  .metric b{display:block; font-family:var(--font-display); font-size:1.85rem; font-weight:700; letter-spacing:-.02em; line-height:1.1}
+  .metric span{font-size:.82rem; color:var(--muted); display:block; margin-top:3px}
+  .metric.ok b{color:var(--live)}
+  .metric.warn b{color:var(--cached)}
 </style>
 
 <div class="wrap">
@@ -221,6 +261,30 @@
     <span class="tag">90 min</span>
   </div>
 </header>
+
+
+<nav class="toc" aria-label="章節導覽">
+  <ul>
+    <li><a href="#status">狀態</a></li>
+    <li><a href="#tests">測試</a></li>
+    <li><a href="#arch">架構</a></li>
+    <li><a href="#modes">三種模式</a></li>
+    <li><a href="#trap">route.ts 陷阱</a></li>
+    <li><a href="#contract">API</a></li>
+    <li><a href="#rules">實作約束</a></li>
+    <li><a href="#timeline">時程</a></li>
+    <li><a href="#before">Build Day 前</a></li>
+    <li><a href="#cuts">砍掉什麼</a></li>
+    <li><a href="#risk">風險</a></li>
+    <li><a href="#next">下一步</a></li>
+  </ul>
+</nav>
+
+<div class="banner">
+  <b>這份 HTML 是後端的唯一文件。</b>
+  原本的 <code>main/BACKEND-ARCHITECTURE.zh-TW.md</code> 與 <code>backend/STATUS.md</code> 已刪除並合併到這裡 —
+  三份文件描述同一個架構必然漂移，改 contract 時只會記得改其中一份。
+</div>
 
 <div class="verdict">
   <p class="eyebrow">結論</p>
@@ -257,7 +321,7 @@
   </div>
 </section>
 
-<section>
+<section id="status">
   <div class="hgroup">
     <p class="eyebrow">目前事實</p>
     <h2>已驗證的，和還沒有的</h2>
@@ -275,7 +339,8 @@
         <li><code>resultId=../../etc/passwd</code> → <code>404</code><em>驗證發生在拼接路徑之前</em></li>
         <li>cached 模式帶出完整 provenance</li>
         <li>壞掉的 sidecar → 降級成 <code>mock</code>，不拋例外</li>
-        <li>timeout 由實測值推導：23.4s × 1.5 = 35s</li>
+        <li><strong>26 unit tests + 11 HTTP 檢查全過</strong><em>零新增依賴</em></li>
+        <li><code>./dev.sh</code> 三條路徑都測過<em>沒有 venv／正常啟動／mosaic 還沒 package.json</em></li>
         <li><strong>8 秒 blocking 生成期間，health 仍即時回應</strong><em>def route 走 threadpool，event loop 沒被凍住</em></li>
       </ul>
     </div>
@@ -290,9 +355,60 @@
       </ul>
     </div>
   </div>
+  <div class="hgroup" style="margin-top:14px">
+    <p class="eyebrow">交接</p>
+    <h2 style="font-size:1.25rem">這次對 <code>mosaic/</code> 的改動</h2>
+  </div>
+  <div class="tw">
+    <table>
+      <tr><th>動作</th><th>檔案</th><th>理由</th></tr>
+      <tr><td><strong style="color:var(--danger)">刪除</strong></td><td><code>app/api/generate/route.ts</code></td><td>會遮蔽 rewrite proxy（見下方）。還原：<code>git checkout mosaic/app/api/generate/route.ts</code> — 但還原之後 proxy 就不會運作</td></tr>
+      <tr><td>新增</td><td><code>next.config.js</code></td><td><code>/api/*</code> 與 <code>/static/*</code> 轉發到 <code>:8000</code></td></tr>
+      <tr><td>填入</td><td><code>types/recipe.ts</code>、<code>types/generation.ts</code></td><td>共用 contract。<code>GenerationResult</code> 就是前端要吃的形狀</td></tr>
+      <tr><td class="kept">未動</td><td><code>data/recipes.ts</code>、<code>services/generation-client.ts</code></td><td>標記 Owner: user</td></tr>
+      <tr><td class="kept">未動</td><td><code>services/generation-server.ts</code></td><td>目前 inert。FastAPI 是唯一 API owner，這個檔案已無用途</td></tr>
+    </table>
+  </div>
 </section>
 
-<section>
+
+<section id="tests">
+  <div class="hgroup">
+    <p class="eyebrow">測試</p>
+    <h2>跑得起來，而且測得過</h2>
+    <p class="lede">用 stdlib <code>unittest</code>，不裝 pytest。每個測試把檔案系統隔離到 tmpdir，所以跑測試永遠不會碰到 <code>storage/</code>，也不可能留下捏造的 provenance sidecar。</p>
+  </div>
+  <div class="metrics">
+    <div class="metric ok"><b>26</b><span>unit tests — pipeline</span></div>
+    <div class="metric ok"><b>11</b><span>HTTP contract 檢查</span></div>
+    <div class="metric ok"><b>0</b><span>新增依賴</span></div>
+    <div class="metric warn"><b>0</b><span>live 生成測試（沒有 provider）</span></div>
+  </div>
+<pre><code><span class="cm"># 管線單元測試</span>
+cd backend &amp;&amp; ./.venv/bin/python -m unittest
+
+<span class="cm"># HTTP contract（自己起一台 :8001）</span>
+./backend/test_api.sh
+
+<span class="cm"># 走 Next.js proxy 測同一組（等 mosaic 起得來之後）</span>
+BASE=http://localhost:3000 ./backend/test_api.sh</code></pre>
+  <div class="tw">
+    <table>
+      <tr><th>測到什麼</th><th>為什麼這件事值得測</th></tr>
+      <tr><td>magic bytes 辨識與拒絕</td><td>Content-Type 是客戶端填的。<code>.txt</code> 改名 <code>.jpg</code> 必須被擋</td></tr>
+      <tr><td>sidecar 驗證：缺欄位／壞 JSON／圖片不存在／路徑逃逸</td><td>sidecar 是一個關於來源的<strong>宣稱</strong>。不完整就不能算 cached</td></tr>
+      <tr><td>三種模式與 <code>fallbackReason</code></td><td>provider 失敗、超時、回傳文字，各自要落到正確的 mode</td></tr>
+      <tr><td>provider 拿到的是<strong>儲存的 prompt</strong>，不是呼叫端傳的字串</td><td>否則 API key 變成免費生圖服務</td></tr>
+      <tr><td>揭露不變量：cached 的 note 不含「即時生成」</td><td>這是整份文件存在的理由</td></tr>
+      <tr><td>result roundtrip、32-hex 驗證、traversal 拒絕</td><td>重新整理要活著；<code>../../etc/passwd</code> 要是 404</td></tr>
+      <tr><td>provider 炸掉時 <code>results/</code> 只留一個 JSON</td><td>證明只有 <code>_write_result</code> 碰磁碟</td></tr>
+      <tr><td>三份 seed 的 creator／IG 仍是 <code>null</code></td><td>守住誠實規則 — 沒人核對過，就不能有名字</td></tr>
+    </table>
+  </div>
+  <p class="lede" style="margin:0"><strong>測試也抓到一個我自己寫錯的斷言：</strong><code>assertNotIn("你這次上傳", ...)</code> 是無效的 — 誠實的句子本身就含這個子字串（在否定句「<strong>不是由</strong>你這次上傳的照片生成」裡面）。舊的檢查只因為當時是 <code>mock</code> 才僥倖通過，一有 cached 素材就會爆。</p>
+</section>
+
+<section id="arch">
   <div class="hgroup">
     <p class="eyebrow">架構</p>
     <h2>一個請求走過的路</h2>
@@ -358,7 +474,7 @@
   </figure>
 </section>
 
-<section>
+<section id="modes">
   <div class="hgroup">
     <p class="eyebrow">誠實層</p>
     <h2>三種結果模式</h2>
@@ -391,7 +507,7 @@
   </div>
 </section>
 
-<div class="callout">
+<div class="callout" id="trap">
   <p class="eyebrow" style="color:var(--danger)">Person 1 必讀</p>
   <h2>那個 route.ts 會讓整條 proxy 失效</h2>
   <p>Next.js 的 rewrites 屬於 <code>afterFiles</code>：<strong>任何實體 route 檔都比 proxy 優先</strong>。<code>mosaic/app/api/generate/route.ts</code> 裡只有 <code>export {}</code>，沒有 POST handler，所以請求會停在 Next 並回 <code>405</code>，永遠到不了 Python。</p>
@@ -440,7 +556,7 @@
 }</code></pre>
 </div>
 
-<section>
+<section id="contract">
   <div class="hgroup">
     <p class="eyebrow">介面</p>
     <h2>API Contract</h2>
@@ -472,7 +588,50 @@ GET  /api/results/{resultId}  <span class="cm">必須符合 ^[0-9a-f]{32}$，否
   <p class="lede" style="margin:0"><strong>傳 recipeId，不傳 prompt。</strong>否則 API key 會變成任何人打開 devtools 就能用的免費生圖服務。</p>
 </section>
 
-<section>
+
+<section id="rules">
+  <div class="hgroup">
+    <p class="eyebrow">實作約束</p>
+    <h2>三條不變量</h2>
+    <p class="lede">違反任何一條，「伺服器不說謊」這個保證就破了。改 <code>generate.py</code> 之前先讀。</p>
+  </div>
+  <ol class="inv">
+    <li><strong><code>_call_provider()</code> 只回傳 bytes，絕不碰檔案系統。</strong>所有寫入都在 <code>_write_result()</code>，在 mode 決定之後發生一次。超時後才回來的殭屍 thread 因此不可能覆寫已經寫好的 cached 結果。</li>
+    <li><strong><code>mode: "live"</code> 代表真的握有一張圖。</strong>provider 的輸出要過跟上傳同一套 <code>_is_image()</code>；回 200 但內容是文字（安全拒絕、把 prompt 當成問答）→ 視為失敗 → fallback。</li>
+    <li><strong>使用者的照片不保留。</strong>bytes → provider → 丟掉，<code>storage/</code> 底下沒有任何使用者輸入。<em>誠實的但書：</em>Starlette 會把大的 multipart 先 spool 到暫存檔，request 結束時刪除 — 我們沒有複製到任何地方，但「完全不落地」講得不精確。</li>
+  </ol>
+  <div class="tw">
+    <table>
+      <tr><th>約束</th><th>為什麼</th></tr>
+      <tr><td>route 一律用 <code>def</code>，不用 <code>async def</code></td><td>Starlette 會丟進 threadpool。同步 SDK 卡 40 秒不會凍住 event loop。<span class="done">已實測</span></td></tr>
+      <tr><td>圖片判斷用 magic bytes，上傳與 provider 輸出共用同一個函式</td><td>一個信任邊界，一份定義</td></tr>
+      <tr><td>寫入順序：先圖片，後 JSON；JSON 走 <code>tmp</code> + <code>os.replace</code></td><td>前端拿到 resultId 會立刻 GET，不能讀到半份 JSON 或指向不存在的圖</td></tr>
+      <tr><td>路徑用 <code>Path(__file__).parent</code> 解析，不相對 cwd</td><td>uvicorn 從 repo root 起、測試從 backend/ 起。<span class="done">兩種都實測過</span></td></tr>
+      <tr><td>resultId 進檔案路徑前必須通過 <code>^[0-9a-f]{32}$</code></td><td>traversal 是 404，不是一次檔案讀取</td></tr>
+      <tr><td>timeout 由 pregen 實測值決定，零重試</td><td>現場重試會讓最壞等待加倍。<span class="kept">實作在 <code>_call_provider</code> 時一起寫</span></td></tr>
+    </table>
+  </div>
+<pre><code><span class="cm"># run_generation 的骨架 —— 唯一決定 mode 的地方</span>
+img, mode, reason, meta = None, "mock", None, None
+
+<span class="ac">if</span> API_KEY:
+    <span class="ac">try</span>:
+        img = _call_provider(recipe["prompt"], image_bytes)   <span class="cm"># 只回 bytes</span>
+        <span class="ac">if</span> _is_image(img) <span class="ac">is</span> None:
+            <span class="ac">raise</span> ValueError("provider returned bytes that are not an image")
+        mode = "live"
+    <span class="ac">except</span> Exception <span class="ac">as</span> err:
+        img, reason = None, f"{type(err).__name__}: {err}"[:200]
+<span class="ac">else</span>:
+    reason = "no_api_key"
+
+<span class="ac">if</span> img <span class="ac">is</span> None:
+    img, mode, meta = _load_fallback(recipe["id"])      <span class="cm"># cached | mock</span>
+
+<span class="ac">return</span> _write_result(recipe, img, mode, meta, reason)   <span class="cm"># 唯一寫檔處</span></code></pre>
+</section>
+
+<section id="timeline">
   <div class="hgroup">
     <p class="eyebrow">執行</p>
     <h2>90 分鐘時程</h2>
@@ -514,7 +673,39 @@ GET  /api/results/{resultId}  <span class="cm">必須符合 ^[0-9a-f]{32}$，否
   </div>
 </section>
 
-<section>
+
+<section id="before">
+  <div class="hgroup">
+    <p class="eyebrow">前置作業</p>
+    <h2>Build Day 之前要做完的事</h2>
+    <p class="lede"><code>pregen.py</code> 就是 <code>_call_provider</code> 的 CLI 入口 — 想在活動前跑 pregen，就等於 live 分支必須在那之前寫完。<strong>live 的開發時間是 Build Day 前，不是當天。</strong></p>
+  </div>
+  <ol class="next">
+    <li class="hot"><span><strong>選 provider、拿到 key。</strong>建議 Google Gemini 影像編輯模型（AI Studio key），備案 Replicate 或 fal.ai。model id、endpoint、request 格式<strong>當場讀線上文件，不憑記憶寫</strong></span></li>
+    <li><span>實作 <code>_call_provider</code>，對三份 seed 各跑一次 <code>pregen.py</code>，用同一張團隊測試照片（seed-03 要狗的照片）</span></li>
+    <li><span><strong>確認 pregen 產出的 bytes 真的是圖。</strong>provider 若回了文字，要在這裡發現，不是在觀眾面前</span></li>
+    <li><span>記下每份 seed 的實際耗時 — 這決定當天的 timeout</span></li>
+    <li><span>核對三則 Threads 貼文的作者與 IG</span></li>
+  </ol>
+  <div class="tw">
+    <table>
+      <tr><th>Build Day 前的狀態</th><th>當天的做法</th></tr>
+      <tr><td>三份 pregen 都成功</td><td>照時程走，T+35 只切 env var</td></tr>
+      <tr><td>部分成功</td><td>成功的走 <code>cached</code>，失敗的走 <code>mock</code>。當天不補</td></tr>
+      <tr><td><strong>一份都沒跑</strong></td><td><strong>當天不碰 live。</strong>T+35–50 改成多測失敗路徑和彩排。全程 <code>mock</code> 也是誠實的 demo</td></tr>
+    </table>
+  </div>
+  <div class="tw">
+    <table>
+      <tr><th>待拍板的設計決策</th><th>目前預設</th><th>什麼時候要改</th></tr>
+      <tr><td>prompt 是否進瀏覽器</td><td>Next.js 只在 server component 讀 <code>recipes.json</code></td><td>若產品認定 prompt 是公開作品可放寬。<strong>這是產品決策，不是技術決策</strong></td></tr>
+      <tr><td>使用者照片不落地</td><td>記憶體 → provider → 丟掉</td><td>不改。要除錯就 log 大小與 magic type，不 log 內容</td></tr>
+      <tr><td><code>fallbackReason</code> 回給前端</td><td>回，但 UI 不顯示</td><td>若會對外開 devtools 展示，改成只寫 log</td></tr>
+    </table>
+  </div>
+</section>
+
+<section id="cuts">
   <div class="hgroup">
     <p class="eyebrow">取捨</p>
     <h2>砍掉了什麼，以及為什麼</h2>
@@ -532,10 +723,26 @@ GET  /api/results/{resultId}  <span class="cm">必須符合 ^[0-9a-f]{32}$，否
       <tr><td class="cut">Docker / 部署設定</td><td>Demo 跑本機</td><td><code>./dev.sh</code></td></tr>
     </table>
   </div>
+  <div class="hgroup" style="margin-top:14px">
+    <p class="eyebrow">ponytail review · 已套用</p>
+    <h2 style="font-size:1.25rem">這一輪又砍掉的</h2>
+  </div>
+  <div class="tw">
+    <table>
+      <tr><th>位置</th><th>發現</th><th>處理</th></tr>
+      <tr><td><code>generate.py</code></td><td><code>live_timeout()</code> 零個 production caller — 11 行加 3 個測試守著沒人跑的程式碼</td><td><span class="done">刪除。</span>它編碼的<strong>決策</strong>留在 <code>_call_provider</code> 的 docstring 裡，實作時就在眼前</td></tr>
+      <tr><td><code>pregen.py</code></td><td>自己重寫一份時間戳格式化</td><td><span class="done">改 import <code>_now</code>。</span>順帶讓 <code>_now</code> 有兩個 caller，原本「inline 掉」的建議自動失效</td></tr>
+      <tr><td><code>main.py</code></td><td>啟動時建三個目錄，但 <code>results/</code> 由 <code>_write_result</code> 建、<code>fallback/</code> 由 pregen 建</td><td><span class="done">只留 <code>STORAGE</code></span>（StaticFiles 需要它存在），少 import 兩個名字</td></tr>
+      <tr><td><code>test_generate.py</code></td><td><code>test_every_result_declares_a_mode</code> 被 <code>Modes</code> 那幾個具體測試完全涵蓋</td><td><span class="done">刪除</span></td></tr>
+      <tr><td><code>test_api.sh</code></td><td>四個欄位存在性檢查，unit test 已逐一斷言過 payload 形狀</td><td><span class="done">刪除</span></td></tr>
+      <tr><td>三份文件</td><td>md + STATUS.md + html 描述同一個架構，改 contract 只會記得改一份</td><td><span class="done">合併成這一頁</span>，另外兩份已刪除</td></tr>
+    </table>
+  </div>
+  <p class="lede" style="margin:0"><strong>net: −43 行</strong>，26 個 unit test 與 11 個 HTTP 檢查全數通過。</p>
   <p class="lede" style="margin:0">保留下來、<strong>不能再砍</strong>的：邊界輸入驗證、伺服器端 prompt 查找、<code>mode</code> / <code>sourceNote</code> 揭露。那是信任邊界與誠實保證。</p>
 </section>
 
-<section>
+<section id="risk">
   <div class="hgroup">
     <p class="eyebrow">風險</p>
     <h2>會出事的地方，和對策</h2>
@@ -554,7 +761,7 @@ GET  /api/results/{resultId}  <span class="cm">必須符合 ^[0-9a-f]{32}$，否
   </div>
 </section>
 
-<section>
+<section id="next">
   <div class="hgroup">
     <p class="eyebrow">下一步</p>
     <h2>照順序做</h2>
@@ -570,7 +777,7 @@ GET  /api/results/{resultId}  <span class="cm">必須符合 ^[0-9a-f]{32}$，否
 
 <footer>
   對應 <code>main/Buildday_prompt.md</code> 第 140–214 行的 Person 2 責任範圍。<br>
-  完整文字版：<code>main/BACKEND-ARCHITECTURE.zh-TW.md</code>　·　實測記錄：<code>backend/STATUS.md</code>
+  這是後端的唯一文件。程式碼在 <code>backend/</code>，seed 資料在 <code>data/recipes.json</code>。
 </footer>
 
 </div>

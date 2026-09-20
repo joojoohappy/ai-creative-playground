@@ -13,10 +13,9 @@ _call_provider already written.
 import json
 import sys
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 
-from generate import FALLBACK_DIR, _call_provider, _is_image, get_recipe
+from generate import FALLBACK_DIR, _call_provider, _is_image, _now, get_recipe
 
 PROVIDER = "TODO: provider name"  # fill in when selected
 MODEL = "TODO: exact model id"    # copy from the provider's live docs, not memory
@@ -47,7 +46,7 @@ FALLBACK_DIR.mkdir(parents=True, exist_ok=True)
             "image": f"{recipe_id}.{ext}",
             "provider": PROVIDER,
             "model": MODEL,
-            "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "generatedAt": _now(),
             "inputPhoto": photo.name,
             "durationSec": duration,
         },

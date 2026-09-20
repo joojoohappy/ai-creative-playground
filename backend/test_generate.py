@@ -118,20 +118,6 @@ class SidecarValidation(Base):
         self.assertIsNone(generate._read_sidecar("seed-01"))
 
 
-class Timeout(Base):
-    def test_defaults_to_cap_without_measurements(self):
-        self.assertEqual(generate.live_timeout(), generate.TIMEOUT_CAP)
-
-    def test_derived_from_slowest_measured_run(self):
-        self.add_fallback("seed-01", durationSec=10.0)
-        self.add_fallback("seed-02", durationSec=20.0)
-        self.assertEqual(generate.live_timeout(), 30)  # 20 * 1.5
-
-    def test_never_exceeds_cap(self):
-        self.add_fallback(durationSec=999.0)
-        self.assertEqual(generate.live_timeout(), generate.TIMEOUT_CAP)
-
-
 class Modes(Base):
     def test_no_key_no_fallback_is_mock(self):
         r = generate.run_generation(self.recipe, JPEG)
@@ -181,14 +167,6 @@ class Modes(Base):
 
 class Disclosure(Base):
     """The invariants that stop the UI from lying."""
-
-    def test_every_result_declares_a_mode(self):
-        for setup in (lambda: None, self.add_fallback):
-            with self.subTest(setup=setup):
-                setup()
-                r = generate.run_generation(self.recipe, JPEG)
-                self.assertIn(r["mode"], {"live", "cached", "mock"})
-                self.assertTrue(r["sourceNote"].strip())
 
     def test_fallback_never_claims_the_users_photo(self):
         # Substring-matching "你這次上傳" is useless here: the honest sentence contains

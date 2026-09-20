@@ -15,9 +15,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from generate import (
-    FALLBACK_DIR,
     MAX_BYTES,
-    RESULTS_DIR,
     STORAGE,
     _is_image,
     get_recipe,
@@ -27,8 +25,7 @@ from generate import (
 
 app = FastAPI(title="MOSAIC backend")
 
-for d in (STORAGE, FALLBACK_DIR, RESULTS_DIR):
-    d.mkdir(parents=True, exist_ok=True)
+STORAGE.mkdir(parents=True, exist_ok=True)  # results/ and fallback/ are made on demand
 app.mount("/static", StaticFiles(directory=STORAGE), name="static")
 
 

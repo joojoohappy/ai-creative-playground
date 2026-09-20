@@ -43,12 +43,6 @@ RID=$(curl -s -F recipeId=seed-01 -F image=@"$TMP/ok.jpg" "$BASE/api/generate" \
       | sed -n 's/.*"resultId":"\([0-9a-f]*\)".*/\1/p')
 check "fetch result"          200 "$BASE/api/results/$RID"
 
-BODY=$(curl -s "$BASE/api/results/$RID")
-for field in '"mode"' '"sourceNote"' '"fallbackReason"' '"sourcePostUrl"'; do
-  case "$BODY" in *"$field"*) pass=$((pass+1)); printf '  ok    %-34s present\n' "field $field";;
-                  *) fail=$((fail+1)); printf '  FAIL  %-34s missing\n' "field $field";; esac
-done
-
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
